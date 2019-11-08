@@ -25,10 +25,10 @@ For coding with Unity, version 2019.
 Section not ready yet
 
 ## Checklist
-[ ] Unity
+### Unity
  - [ ] Communicate with python script
  - [ ] Have raycast from mouse to certain position on chess board
-[ ] Python
+### Python
  - [ ] AI
    - [ ] Have a simple testing AI
    - [ ] Save and store an AI instance
