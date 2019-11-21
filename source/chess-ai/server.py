@@ -1,12 +1,33 @@
 #!/usr/bin/env python3
-"""
-Very simple HTTP server in python for logging requests
-Usage::
-    ./server.py [<port>]
-"""
+
+from __future__ import absolute_import, division, print_function, unicode_literals
+
 from http.server import BaseHTTPRequestHandler, HTTPServer
+import tensorflow as tf
+
+
 import logging
 
+mnist = tf.keras.datasets.mnist
+
+(x_train, y_train), (x_test, y_test) = mnist.load_data()
+x_train, x_test = x_train / 255.0, x_test / 255.0
+model = tf.keras.models.Sequential([
+  tf.keras.layers.Flatten(input_shape=(28, 28)),
+  tf.keras.layers.Dense(128, activation='relu'),
+  tf.keras.layers.Dropout(0.2),
+  tf.keras.layers.Dense(10, activation='softmax')
+])
+
+model.compile(optimizer='adam',
+              loss='sparse_categorical_crossentropy',
+              metrics=['accuracy'])
+
+model.fit(x_train, y_train, epochs=5)
+
+model.evaluate(x_test,  y_test, verbose=2)
+
+print("-----------------------------------")
 class S(BaseHTTPRequestHandler):
     def _set_response(self):
         self.send_response(200)
@@ -20,8 +41,8 @@ class S(BaseHTTPRequestHandler):
                 str(self.path), str(self.headers), post_data.decode('utf-8'))
 
         self._set_response()
-        if (self.headers.get("message") == "ping"):
-            self.wfile.write("pong".encode('utf-8'))
+        if (self.headers.get("message") != ""):
+            self.wfile.write(self.headers.get("message").encode('utf-8'))
         else:
             self.wfile.write("POST request for {}".format(self.path).encode('utf-8'))
 
