@@ -14,6 +14,8 @@ public class ChessManager : MonoBehaviour
     public GameObject board;
     public static ChessManager Instance;
     public static bool BlackTurn = false;
+    public ServerImp server;
+    public Transform PlayerRig;
     private void Awake()
     {
         Instance = this;
@@ -29,14 +31,32 @@ public class ChessManager : MonoBehaviour
         {
             for (int col = 0; col < Board[row].Length; col++)
             {
-                PManager.AddPieceToBoard(Board[row][col], new Position((File)col, row+1));
+                PManager.AddPieceToBoard(Board[row][col], new Position((File)col, row + 1));
             }
         }
-        Caster.Log("<color=green><b>Finished generating pieces</b></color>");
+        Status.Log("<color=green><b>Finished generating pieces</b></color>");
+        server = new ServerImp();
+        server.ResponseRecieved += Server_ResponseRecieved;
         //Position 
         //Move move = new Move();
         //Game.MakeMove();
     }
+
+    private void Server_ResponseRecieved(object sender, ResponseEventArgs e)
+    {
+        if (e.RequestValues.ContainsKey("test"))
+        {
+            return;
+        }
+        Status.Log("<color=\"green\">Recieved  '" + e.Message + "' from server</color>");
+        Position from = new Position(e.Message[0].ToString() + e.Message[1].ToString());
+        Position to = new Position(e.Message[2].ToString() + e.Message[3].ToString());
+        Move m = new Move(from, to, current);
+        MakeMove(m, false);
+
+
+    }
+
     public List<Move> possibleMoves(Position pos)
     {
         List<Move> moves = new List<Move>();
@@ -44,11 +64,29 @@ public class ChessManager : MonoBehaviour
         return moves;
     }
 
-    public static void MakeMove(Move move)
+    public static void MakeMove(Move move, bool player)
     {
+        Status.Log("<b> " + (player? "Player ":"AI") + "Moving " + move.OriginalPosition.ToString() + " to " + move.NewPosition.ToString() + "</b>");
+
         Instance.Game.MakeMove(move, true);
         Instance.current = Instance.Game.WhoseTurn;
         BlackTurn = !BlackTurn;
+        
+        if (player)
+        {
+            Status.Log("<color=\"blue\">Sending </color>'<b>" + Instance.Game.GetFen() + "</b>'");
+
+            Dictionary<string, string> values = new Dictionary<string, string>
+            {
+            { "board", Instance.Game.GetFen() },
+            };
+
+            Instance.server.Send(values);
+        }
+        PieceManager.getFromPosition(move.OriginalPosition).gamePiece.MoveTo(move.NewPosition);
+
+        
+
     }
     public static string BoardToString()
     {
@@ -65,7 +103,8 @@ public class ChessManager : MonoBehaviour
                     string p = Instance.Game.GetBoard()[i][j].GetFenCharacter().ToString();
                     string add = "<b>" + (p == p.ToUpper() ? "<color=red>" : "<color=blue>") + p + "</color></b>";
                     output += add;
-                } catch (Exception)
+                }
+                catch (Exception)
                 {
                     output += "X";
                 }
@@ -73,6 +112,7 @@ public class ChessManager : MonoBehaviour
             }
             output += "\n";
         }
-        return  output + "</mspace>";
+        return output + "</mspace>\n" + ChessManager.Instance.Game.GetPGN();
     }
+    
 }

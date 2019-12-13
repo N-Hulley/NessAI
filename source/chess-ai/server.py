@@ -3,29 +3,24 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 from http.server import BaseHTTPRequestHandler, HTTPServer
-import tensorflow as tf
-
+from stockfish import Stockfish
+import os
 
 import logging
+from datetime import datetime
+import socket    
+hostname = socket.gethostname()    
+IPAddr = socket.gethostbyname(hostname)    
+print("Your Computer Name is:" + hostname)    
+print("Your Computer IP Address is:" + IPAddr) 
+print("-----------------------------------")
+print("Initialising Stockfish")
 
-mnist = tf.keras.datasets.mnist
-
-(x_train, y_train), (x_test, y_test) = mnist.load_data()
-x_train, x_test = x_train / 255.0, x_test / 255.0
-model = tf.keras.models.Sequential([
-  tf.keras.layers.Flatten(input_shape=(28, 28)),
-  tf.keras.layers.Dense(128, activation='relu'),
-  tf.keras.layers.Dropout(0.2),
-  tf.keras.layers.Dense(10, activation='softmax')
-])
-
-model.compile(optimizer='adam',
-              loss='sparse_categorical_crossentropy',
-              metrics=['accuracy'])
-
-model.fit(x_train, y_train, epochs=5)
-
-model.evaluate(x_test,  y_test, verbose=2)
+dirname = os.path.dirname(__file__)
+print(dirname)
+filename = os.path.join(dirname, 'stockfish-10-linux/Linux/stockfish_10_x64')
+stockfish = Stockfish(filename)
+print("Stockfish Ready")
 
 print("-----------------------------------")
 class S(BaseHTTPRequestHandler):
@@ -36,20 +31,40 @@ class S(BaseHTTPRequestHandler):
 
     def do_POST(self):
         content_length = int(self.headers['Content-Length']) 
-        post_data = self.rfile.read(content_length) 
+        post_data = self.rfile.read(content_length)
         logging.info("POST request,\nPath: %s\nHeaders:\n%s\n\nBody:\n%s\n",
-                str(self.path), str(self.headers), post_data.decode('utf-8'))
-
+        str(self.path), str(self.headers), post_data.decode('utf-8') )
+        
+        
+        now = datetime.now()
+        current_time = now.strftime("%H:%M:%S")
         self._set_response()
-        if (self.headers.get("message") != ""):
-            self.wfile.write(self.headers.get("message").encode('utf-8'))
+        
+        print("Current Time =", current_time)
+        passedMessage = post_data.decode('utf-8').replace("%2F", "/").replace("+"," ").replace("board=","")
+        if (passedMessage == "test=test"):
+            self.wfile.write("pong".encode('utf-8'))
+
         else:
-            self.wfile.write("POST request for {}".format(self.path).encode('utf-8'))
+            try:
+                print(passedMessage)
+                stockfish.set_fen_position(passedMessage)
+                move = stockfish.get_best_move()
+                print(move)        
+                self.wfile.write(move.encode('utf-8'))
+            except:
+                self.wfile.write("Error".encode('utf-8'))
+
+
+
+        #.encode('utf-8')
+        
 
         
-def run(server_class=HTTPServer, handler_class=S, port=8080):
+def run(server_class=HTTPServer, handler_class=S, port=3389):
     logging.basicConfig(level=logging.INFO)
     server_address = ('', port)
+    print("Running on " + str(server_address))
     httpd = server_class(server_address, handler_class)
     logging.info('Starting http...\n')
     try:
